@@ -1,5 +1,5 @@
 from fastapi import Depends, FastAPI, HTTPException
-
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -11,6 +11,7 @@ import bcrypt
 import jwt
 
 import os
+
 
 
 from datetime import datetime, timedelta, timezone
@@ -39,7 +40,7 @@ def create_access_token(user_id:int):
 
 app = FastAPI()
 
-    
+security = HTTPBearer()    
 
 class UserRegister(BaseModel):
     email: str
@@ -57,9 +58,11 @@ class NotePublic(BaseModel):
     id: int
 
 
+
 class CreateProduct(BaseModel):
     title: str
     price: int
+
 
 
 class ProductPublic(BaseModel):
@@ -74,20 +77,30 @@ class Orderpublic(BaseModel):
 
 
 
-
-def get_current_user(token, db:Session = Depends(get_db)):
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+        ):
+    token = credentials.credentials
 
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        payload = jwt.decode(token, SECRET_KEY, algorithms = ["HS256"])
     except:
-        raise HTTPException(status_code=401, detail="Билет потух")      
-    user_id = int(payload["sub"])
+        raise HTTPException(status_code = 401, detail = "билет потух")
+    
 
-    user  = db.query(UserDB).filter(UserDB.id == user_id).first()
+    user_id = int(payload["sub"])
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+
     if user is None:
-        raise HTTPException(status_code=401, detail="Юзер не найден")      
+        raise HTTPException(status_code = 401, detail = "такого юзера в списке нет")
     return user
 
+
+
+@app.get("/auth/me")
+def show_current_user_my_account(current_user: UserDB = Depends(get_current_user)):
+    return UserPublic(id = current_user.id, email = current_user.email)
 
 
 
@@ -103,11 +116,10 @@ def create_account(user_data: UserRegister, db: Session = Depends(get_db)):
     return {"message": "Вы успешно зарегестрировались"}
 
 
+
 @app.get("/auth/me")
 def show_my_account(current_user: UserDB = Depends(get_current_user)):
     return UserPublic(id = current_user.id, email = current_user.email)
-    
-
 
 
 
@@ -121,7 +133,6 @@ def confirm_registered(user_data: UserRegister, db: Session = Depends(get_db)):
 
     else:
         raise HTTPException(status_code=401, detail = "Неверный логин или пароль")
-
 
 
 
@@ -202,7 +213,7 @@ def OpenNotes(note_id: int, db: Session = Depends(get_db), current_user = Depend
 
 
 @app.post("/products")
-def open_product(product_data: CreateProduct, current_user = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_product(product_data: CreateProduct, current_user = Depends(get_current_user), db: Session = Depends(get_db)):
     if not product_data.title.strip():
         raise HTTPException(status_code = 400, detail = "поле не должно быть пустым")
 
@@ -370,4 +381,5 @@ def show_shop(current_user = Depends(get_current_user), db: Session = Depends(ge
     
         shop_list.append(shopforsalespublic)
     return shop_list
+
 
