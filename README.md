@@ -5,3 +5,4 @@
 # marketplace
 # marketplace_tipa
 # marketplace_tipa
+# mini-marketplace
