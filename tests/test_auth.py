@@ -77,3 +77,4 @@ def test_create_product_ok():
         headers = {"Authorization": f"Bearer {token}"}
     )
     assert response.status_code == 200
+
