@@ -1,11 +1,12 @@
-FROM python:3.14-slim
+FROM python:3.12-slim
 
 WORKDIR /App
 
-Copy requirements.txt .
-Run pip install -r requiremetns.txt
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-COPY main.py database.py models.py .
+COPY . .
 
 CMD ["uvicorn", "main:app" ,"--host", "0.0.0.0", "--port", "8000"]
+
 
