@@ -59,3 +59,37 @@ def test_cannot_order_twice(client, make_user):
     product_id = create_product(client, seller).json()["id"]
     client.post(f"/order?product_id={product_id}", headers=buyer)
     assert client.post(f"/order?product_id={product_id}", headers=buyer).status_code == 400
+
+
+def test_shop_pagination(client, make_user):
+    seller, buyer = make_user(), make_user()
+    for i in range(5):
+        create_product(client, seller, title=f"item {i}")
+
+    first = client.get("/shop?limit=2&offset=0", headers=buyer).json()
+    second = client.get("/shop?limit=2&offset=2", headers=buyer).json()
+    last = client.get("/shop?limit=2&offset=4", headers=buyer).json()
+
+    assert [len(first), len(second), len(last)] == [2, 2, 1]
+    ids = [p["id"] for p in first + second + last]
+    assert ids == sorted(set(ids))
+
+
+def test_shop_pagination_limits(client, make_user):
+    headers = make_user()
+    assert client.get("/shop?limit=0", headers=headers).status_code == 422
+    assert client.get("/shop?limit=101", headers=headers).status_code == 422
+    assert client.get("/shop?offset=-1", headers=headers).status_code == 422
+
+
+def test_delete_account_cascades(client, make_user):
+    seller, buyer = make_user(), make_user()
+    product_id = create_product(client, seller).json()["id"]
+    client.post(f"/order?product_id={product_id}", headers=buyer)
+
+    assert client.delete("/auth/me", headers=seller).status_code == 200
+
+    # товар продавца удалился каскадом, вместе с ним и заказ покупателя
+    assert client.get("/shop", headers=buyer).json() == []
+    assert client.get("/order", headers=buyer).json() == []
+    assert client.get("/auth/me", headers=seller).status_code == 401

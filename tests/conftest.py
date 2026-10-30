@@ -5,7 +5,7 @@ os.environ.setdefault("SECRET_KEY", "testsecret")
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -21,6 +21,12 @@ def client():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+
+    @event.listens_for(engine, "connect")
+    def enable_foreign_keys(dbapi_connection, _):
+        dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
     Base.metadata.create_all(bind=engine)
     TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

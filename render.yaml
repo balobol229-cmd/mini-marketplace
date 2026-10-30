@@ -1,0 +1,18 @@
+# Blueprint для Render: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: mini-marketplace
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mini-marketplace-db
+          property: connectionString
+
+databases:
+  - name: mini-marketplace-db
+    plan: free

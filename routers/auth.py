@@ -16,7 +16,7 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Пользователь уже зарегистрирован")
 
     hashed = bcrypt.hashpw(user_data.password.encode("utf-8"), bcrypt.gensalt())
-    db.add(UserDB(email=user_data.email, password=hashed.decode("utf-8")))
+    db.add(UserDB(email=user_data.email, hashed_password=hashed.decode("utf-8")))
     db.commit()
 
     return {"message": "Вы успешно зарегистрировались"}
@@ -26,7 +26,7 @@ def register(user_data: UserRegister, db: Session = Depends(get_db)):
 def login(user_data: UserRegister, db: Session = Depends(get_db)):
     user = db.query(UserDB).filter(UserDB.email == user_data.email).first()
     password_ok = user and bcrypt.checkpw(
-        user_data.password.encode("utf-8"), user.password.encode("utf-8")
+        user_data.password.encode("utf-8"), user.hashed_password.encode("utf-8")
     )
     if not password_ok:
         raise HTTPException(status_code=401, detail="Неверный логин или пароль")
@@ -37,3 +37,13 @@ def login(user_data: UserRegister, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserPublic)
 def me(current_user: UserDB = Depends(get_current_user)):
     return current_user
+
+
+@router.delete("/me")
+def delete_me(
+    current_user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Удаляет аккаунт; товары, заказы и заметки удаляются каскадом на уровне БД."""
+    db.delete(current_user)
+    db.commit()
+    return {"ok": True}
