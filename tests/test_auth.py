@@ -1,80 +1,49 @@
-
-import os
-os.environ["SECRET_KEY"] = "testsecret"
-
-from main import app
-from fastapi.testclient import TestClient
-
-import uuid
-
-client = TestClient(app)
-
-
-def test_register():
-    email = f"{uuid.uuid4().hex}@gmail.com"
+def test_register(client):
     response = client.post(
-        "/auth/register",
-        json = {"email": email, "password": "123"}
+        "/auth/register", json={"email": "user@example.com", "password": "password123"}
     )
     assert response.status_code == 200
 
 
+def test_register_duplicate_email(client):
+    body = {"email": "user@example.com", "password": "password123"}
+    client.post("/auth/register", json=body)
+    assert client.post("/auth/register", json=body).status_code == 400
 
-def test_show_my_accoutn_ok():
-    email = "me_user_9@gmail.com."
-    password =  "123"
 
-#юзера создать
-    client.post("/auth/register",
-        json = {"email": "me_user_9@gmail.com.", "password": "123"})
-#войти
-    login = client.post("/auth/login",
-        json = {"email": "me_user_9@gmail.com.", "password": "123"})
-#окончательно войти aka token
-    token = login.json()["access_token"]
-
-    response = client.get(
-        "/auth/me",
-        headers = {"Authorization": f"Bearer {token}"}
+def test_register_short_password(client):
+    response = client.post(
+        "/auth/register", json={"email": "user@example.com", "password": "123"}
     )
-    assert response.status_code == 200
+    assert response.status_code == 422
 
 
-def test_wrong_login_ok():
-    email = f"{uuid.uuid4().hex}@gmail.com"
-    password = f"{uuid.uuid4().hex}"
-    client.post(
-        "/auth/register",
-        json = {"email": email, "password": password}
+def test_register_invalid_email(client):
+    response = client.post(
+        "/auth/register", json={"email": "not-an-email", "password": "password123"}
     )
-    response = client.post("/auth/login",
-        json = {"email": email, "password": "неверный"}
+    assert response.status_code == 422
+
+
+def test_login_wrong_password(client):
+    client.post("/auth/register", json={"email": "user@example.com", "password": "password123"})
+    response = client.post(
+        "/auth/login", json={"email": "user@example.com", "password": "wrongpassword"}
     )
     assert response.status_code == 401
 
 
-
-def test_create_product_ok():
-    title = f"{uuid.uuid4()}"
-    price = 100
-    email = f"{uuid.uuid4().hex}@gmail.com" 
-    password = f"{uuid.uuid4().hex}"
-
-    client.post(
-        "/auth/register",
-        json = {"email": email, "password": password}
-    )
-
-    login = client.post(
-        "/auth/login",
-        json = {"email": email, "password": password}
-    )
-    token = login.json()["access_token"]
-
-    response = client.post(
-        "/products",
-        json = {"price": price, "title": title},
-        headers = {"Authorization": f"Bearer {token}"}
-    )
+def test_me(client, make_user):
+    response = client.get("/auth/me", headers=make_user())
     assert response.status_code == 200
+    assert "password" not in response.json()
 
+
+def test_me_without_token(client):
+    assert client.get("/auth/me").status_code in (401, 403)
+
+
+def test_me_invalid_token(client):
+    response = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"

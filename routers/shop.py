@@ -1,25 +1,18 @@
-from fastapi import Depends, APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from database import get_db
 
-from models import ProductforsaleDB
+from database import get_db
+from models import ProductDB, UserDB
 from schemas import ProductPublic
 from security import get_current_user
 
 router = APIRouter(prefix="/shop", tags=["shop"])
 
 
-@router.get("")
-def show_shop(current_user = Depends(get_current_user), db: Session = Depends(get_db)):
-    shop_list = []
-
-    open_shop_other_users = db.query(ProductforsaleDB).filter(ProductforsaleDB.user_id != current_user.id).all()
-
-    for shop in open_shop_other_users:
-        shopforsalespublic = ProductPublic(id = shop.id, title = shop.title, price = shop.price) 
-
-    
-    
-        shop_list.append(shopforsalespublic)
-    return shop_list
-
+@router.get("", response_model=list[ProductPublic])
+def show_shop(
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Витрина: товары всех пользователей, кроме собственных."""
+    return db.query(ProductDB).filter(ProductDB.user_id != current_user.id).all()
